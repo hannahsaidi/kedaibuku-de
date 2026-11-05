@@ -76,10 +76,14 @@ def clean_books():
 
 def clean_customers():
     c = pd.read_csv(f"{BRONZE}/customers.csv").drop_duplicates()
+    # Remove rows with missing values
+    c = c.dropna()
     c["state"] = c["state"].str.strip().map(lambda s: STATE_MAP.get(s.lower(), s))
     c["email_missing"] = c["email"].isna()
     c["email_hash"] = c["email"].map(hash_value)
     c["email_masked"] = c["email"].map(mask_email)
+    c["email_hash"] = c["email_hash"].fillna("")
+    c["email_masked"] = c["email_masked"].fillna("Not provided")
     c["birth_year"] = c["mykad"].map(birth_year_from_mykad)
     c["age_group"] = pd.cut(2026 - c["birth_year"], bins=[0, 24, 34, 44, 54, 120],
                             labels=["<25", "25-34", "35-44", "45-54", "55+"]).astype(str)
