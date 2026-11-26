@@ -2,22 +2,39 @@
 
 Run from the project folder:  python src/extract_fx.py
 """
+
 import json
 import os
+import subprocess
 from datetime import date
 
 import requests
 
-URL = "https://api.bnm.gov.my/public/exchange-rate/GBP?session=0900&quote=rm"
-HEADERS = {"Accept": "application/vnd.BNM.API.v1+json"}   # the BNM API requires this header
+URL = "https://api.bnm.gov.my/public/exchange-rate/GBP"
+HEADERS = {
+    "Accept": "application/vnd.BNM.API.v1+json"
+}  # the BNM API requires this header
+
+
+def fetch():
+    response = requests.get(URL, headers=HEADERS, timeout=20)
+    if response.status_code == 403:
+        # BNM's firewall (Cloudflare) blocks Python on some networks; curl usually gets through
+        out = subprocess.run(
+            ["curl", "-s", "-f", "-H", "Accept: application/vnd.BNM.API.v1+json", URL],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        return json.loads(out)
+    response.raise_for_status()
+    return response.json()
 
 
 def extract_fx():
     os.makedirs("data/lake/bronze", exist_ok=True)
-    response = requests.get(URL, headers=HEADERS, timeout=20)
-    response.raise_for_status()
-    payload = response.json()
-    path = f"data/lake/bronze/fx_gbp_{date.today():%Y%m%d}.json"   # one new file per day
+    payload = fetch()
+    path = f"data/lake/bronze/fx_gbp_{date.today():%Y%m%d}.json"  # one new file per day
     with open(path, "w") as f:
         json.dump(payload, f, indent=2)
     return path, payload
